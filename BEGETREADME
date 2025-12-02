@@ -1,0 +1,138 @@
+Инструкция по деплою телеграм-бота на Beget VDS (Ubuntu)
+========================================================
+
+Что важно про Beget.com
+-----------------------
+- Панель «Управление сервером» → «Доступ» показывает IP VDS, пароль root и SSH-ключи. При первом входе сразу смените пароль root и добавьте свой ключ (кнопка «Добавить ключ»).
+- Вкладка «Бэкапы» позволяет делать снимки; удобно перед крупными обновлениями.
+- Встроенный «Менеджер файлов» (как на скриншотах) подходит для разовых правок, но для работы с кодом лучше использовать git и SSH.
+
+1) Базовая подготовка VDS
+-------------------------
+```bash
+ssh root@<IP_из_панели>
+apt update && apt upgrade -y
+apt install -y git python3 python3-venv python3-pip tesseract-ocr tesseract-ocr-rus tesseract-ocr-eng
+```
+Опционально создайте отдельного пользователя:
+```bash
+adduser --disabled-password --gecos "InvoiceBot" invoicebot
+usermod -aG sudo invoicebot
+sudo -iu invoicebot
+```
+
+2) Развёртывание кода
+---------------------
+```bash
+sudo mkdir -p /opt/invoicebot
+sudo chown $USER:$USER /opt/invoicebot
+cd /opt/invoicebot
+git clone <URL_ВАШЕГО_РЕПО>.
+cd Raspoznavatelb_bot2/Bot
+```
+
+3) Виртуальное окружение и зависимости
+--------------------------------------
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install --upgrade pip
+pip install -r requirements.txt
+```
+
+4) Настройка окружения
+----------------------
+- Создайте `.env` в каталоге `Bot` (по шаблону ниже) и скопируйте туда свои ключи:
+```env
+TELEGRAM_BOT_TOKEN=...           # токен бота
+OPENAI_API_KEY=...               # ключ OpenAI (gpt-4.1)
+GOOGLE_SHEETS_SPREADSHEET_ID=... # id таблицы или полная ссылка
+GOOGLE_SHEETS_WORKSHEET_TITLE=...# название листа
+GOOGLE_AUTH_MODE=oauth
+GOOGLE_OAUTH_CLIENT_SECRETS_FILE=credentials_drive.json
+GOOGLE_OAUTH_TOKEN_FILE=token_drive.json
+GOOGLE_DRIVE_FOLDER_ID=...       # папка для загрузки файлов
+ALLOW_SHEETS_WITHOUT_DRIVE_FILE=false
+LOG_LEVEL=INFO
+```
+- Через «Менеджер файлов» панели можно загрузить `credentials_drive.json` и `token_drive.json` в `Bot` или воспользоваться `scp`:
+```bash
+scp credentials_drive.json root@<IP>:/opt/invoicebot/Raspoznavatelb_bot2/Bot/
+```
+- Первичная авторизация Google (даёт `token_drive.json`):
+```bash
+source .venv/bin/activate
+python scripts/init_drive_oauth.py
+# Откройте ссылку в браузере, подтвердите доступ, вставьте код обратно в консоль.
+```
+
+5) Ручовой запуск для проверки
+------------------------------
+```bash
+cd /opt/invoicebot/Raspoznavatelb_bot2/Bot
+source .venv/bin/activate
+python main.py
+```
+Отправьте тестовый документ боту и убедитесь, что данные пишутся в Google Sheets/Drive.
+
+6) Автозапуск через systemd
+---------------------------
+Создайте `/etc/systemd/system/invoicebot.service` (путь к проекту поправьте, если другой):
+```ini
+[Unit]
+Description=Telegram Invoice Bot
+After=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/invoicebot/Raspoznavatelb_bot2/Bot
+Environment="PYTHONUNBUFFERED=1"
+ExecStart=/opt/invoicebot/Raspoznavatelb_bot2/Bot/.venv/bin/python /opt/invoicebot/Raspoznavatelb_bot2/Bot/main.py
+Restart=always
+RestartSec=5
+User=invoicebot
+Group=invoicebot
+
+[Install]
+WantedBy=multi-user.target
+```
+Активируйте сервис:
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable --now invoicebot.service
+```
+Смотрите логи:
+```bash
+journalctl -u invoicebot.service -f
+```
+
+7) Обновления и резервные копии
+-------------------------------
+```bash
+cd /opt/invoicebot/Raspoznavatelb_bot2
+git pull
+cd Bot && source .venv/bin/activate && pip install -r requirements.txt
+sudo systemctl restart invoicebot.service
+```
+- Перед апдейтами делайте снимок VDS в «Бэкапах» панели или системный бэкап `.env` + `credentials_drive.json` + `token_drive.json`.
+- Регулярно обновляйте систему (`sudo apt update && sudo apt upgrade`).
+- Если токен Google истёк, повторите `python scripts/init_drive_oauth.py`.
+
+Подсказки по панели Beget
+-------------------------
+- **Доступ**: SSH-порт стандартный 22; если меняли в настройках, указывайте `ssh -p <порт> root@<IP>`.
+- **Файлы**: «Менеджер файлов» → папка `/opt/invoicebot/...` (как на скриншоте) позволяет просмотреть логи, заменить `.env` или загрузить ключи.
+- **Мониторинг**: графики нагрузки и диска в панели помогают понять, хватает ли ресурсов. Если бот тормозит — увеличьте тариф или оптимизируйте логи.
+
+Траблшутинг «System has not been booted with systemd»
+------------------------------------------------------
+Если при выполнении `systemctl` или запуске сервиса получаете сообщение `System has not been booted with systemd as init system`:
+- Убедитесь, что вы работаете именно на VDS Beget, а не внутри контейнера или WSL без systemd. На настоящем VDS systemd доступен из коробки.
+- Для WSL2 включите systemd в `/etc/wsl.conf` (от имени администратора Windows):
+  ```ini
+  [boot]
+  systemd=true
+  ```
+  затем выполните `wsl --shutdown` и откройте дистрибутив снова.
+- Если используете минимальный контейнер без systemd, вместо `systemctl` применяйте `service` (например, `sudo service invoicebot restart`) или поднимайте полноценный VDS.
+На VDS Beget после исправления достаточно повторить команды из шага 6 для регистрации и запуска юнита.
