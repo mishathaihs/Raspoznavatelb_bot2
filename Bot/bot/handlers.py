@@ -722,8 +722,18 @@ def _build_summary(doc: ParsedDocument, order_number: int, file_saved: bool) -> 
             return None
         return strip_address(value)
 
-    supplier_display = _display_name(resolved_parties.executor_name or resolved_parties.executor_raw)
-    customer_display = _display_name(resolved_parties.buyer_name or resolved_parties.buyer_raw)
+    supplier_display = _display_name(
+        resolved_parties.executor_name
+        or resolved_parties.executor_raw
+        or (doc.supplier.name if doc.supplier else None)
+        or doc.supplier_raw
+    )
+    customer_display = _display_name(
+        resolved_parties.buyer_name
+        or resolved_parties.buyer_raw
+        or (doc.buyer.name if doc.buyer else None)
+        or doc.customer_raw
+    )
 
     currency = doc.currency if doc.currency not in {None, "UNKNOWN"} else None
     if not currency and doc.currency_code not in {None, "UNKNOWN"}:
@@ -766,50 +776,6 @@ def _build_summary(doc: ParsedDocument, order_number: int, file_saved: bool) -> 
     if vat_rate:
         rate_text = format_money_ru(vat_rate, empty="") or str(vat_rate)
         totals_block.append(f"• Ставка НДС: {esc(rate_text)} %")
-
-    def _valid_items(items: list[Item]) -> list[Item]:
-        valid: list[Item] = []
-        for it in items:
-            if not it:
-                continue
-            name = (it.name or it.description or "").strip()
-            has_values = any(
-                value is not None
-                for value in (
-                    it.amount_with_vat,
-                    it.total_with_vat,
-                    it.amount_without_vat,
-                    it.price,
-                    it.vat_amount,
-                )
-            )
-            if name and has_values:
-                valid.append(it)
-        return valid
-
-    valid_items = _valid_items(doc.items)
-    item_lines: list[str] = []
-    for idx, item in enumerate(valid_items, start=1):
-        amount = item.amount_with_vat or item.total_with_vat or item.amount_without_vat
-        item_currency = item.currency or currency
-        vat_amount = item.vat_amount
-        price = (
-            f"; цена: {esc(_format_money(item.price, item_currency, text=item.price_text))}"
-            if item.price is not None or item.price_text
-            else ""
-        )
-        vat_rate_value = item.vat_rate or item.vat_rate_text
-        vat_display = _format_money(vat_amount, item_currency, text=item.vat_amount_text)
-        if vat_rate_value and vat_display != "—":
-            rate_text = format_money_ru(vat_rate_value, empty="") or str(vat_rate_value)
-            vat_display = f"{vat_display} ({rate_text}%)"
-        item_lines.append(
-            f"{idx}. {esc(item.name or item.description or '—')} — {esc(_format_money(amount, item_currency, text=item.amount_with_vat_text))}{price}"
-            + (f"; НДС: {esc(vat_display)}" if vat_display != "—" else "")
-        )
-    if not item_lines:
-        item_lines.append("—")
-    positions_count = len(valid_items)
 
     warnings = list(doc.warnings)
     if doc.sums_suspect:
@@ -869,7 +835,6 @@ def _build_summary(doc: ParsedDocument, order_number: int, file_saved: bool) -> 
         f"Исполнитель: {esc(supplier_display or 'не распознан')}\n"
         f"Валюта: {esc(currency or doc.currency_code or '—')}\n\n"
         f"<b>Итого по документу:</b>\n" + "\n".join(totals_block) + "\n\n"
-        + f"<b>Основные позиции:</b>\n" + "\n".join(item_lines) + "\n" + (f"\nПозиций в документе: {positions_count}\n\n")
         + f"Номер по порядку: {order_number}\n"
         f"{esc(drive_line)}{normalization_line}{warning_line}"
     )
