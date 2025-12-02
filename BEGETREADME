@@ -18,7 +18,21 @@ apt install -y git python3 python3-venv python3-pip tesseract-ocr tesseract-ocr-
 ```bash
 adduser --disabled-password --gecos "InvoiceBot" invoicebot
 usermod -aG sudo invoicebot
+# Задайте пароль для пользователя (нужен для sudo):
+passwd invoicebot
+# Переключитесь на него для дальнейшей работы
 sudo -iu invoicebot
+```
+
+Если подключились напрямую под пользователем (не root) и при выполнении `sudo mkdir -p /opt/invoicebot` система просит пароль,
+введите пароль, который задали командой `passwd <имя_пользователя>`. Если пароль не задавали, зайдите под root (пароль и ключи
+показываются в панели «Доступ») и выполните создание каталога без `sudo`:
+```bash
+ssh root@<IP>
+mkdir -p /opt/invoicebot
+chown invoicebot:invoicebot /opt/invoicebot
+su - invoicebot
+cd /opt/invoicebot
 ```
 
 2) Развёртывание кода
