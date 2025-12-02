@@ -1,0 +1,67 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+.venv/
+venv/
+.env
+.env.*
+!.env.example
+
+# Editor settings
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Local data and credentials
+*.log
+token_drive.json
+*.sqlite3
+
+# Build / temp outputs
+.eggs/
+*.egg-info/
+.dist/
+dist/
+build/
+
+# pytest / coverage
+.pytest_cache/
+.coverage*
+htmlcov/
+
+# Generated artifacts and binaries
+outputs/
+artifacts/
+*.doc
+*.docx
+*.pdf
+*.xls
+*.xlsx
+*.jpg
+*.jpeg
+*.png
+*.gif
+*.bmp
+*.tif
+*.tiff
+*.mp3
+*.mp4
+*.zip
+*.7z
+*.db
+*.sqlite
+*.pyo
+*.pyd
+*.so
+*.dll
+*.exe
+
+# Generated templates
+templates/*.docx
+
