@@ -76,6 +76,7 @@
    python scripts/init_drive_oauth.py
    ```
 2. Откройте ссылку, выданную скриптом, авторизуйтесь в Google, скопируйте код подтверждения и вставьте в консоль. После этого появится `token_drive.json`.
+   - Если увидите ошибку `invalid_scope`: удалите `token_drive.json`, убедитесь, что `credentials_drive.json` создан как **Desktop app** в Google Cloud Console, с включёнными API *Google Drive* и *Google Sheets*, и повторите пункт 1.
 
 Шаг 6. Тестовый запуск вручную
 ------------------------------
