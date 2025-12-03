@@ -126,6 +126,7 @@ General rules:
 - NEVER invent or hallucinate values that are not clearly visible on the image.
 - If you cannot confidently read a value, set it to null instead of guessing.
 - All money and numeric fields MUST use a dot as decimal separator, no thousand separators, e.g.: 1195.00, 239.00, 1434.00.
+- Totals must be copied exactly from the document totals row; preserve cents and do not round.
 - doc_type for this kind of document MUST be exactly "товарная_накладная".
 - Do NOT fabricate company types or addresses (like "ЗАО ХХХ 220039, г. Минск, ул. Долгобродская, 25") if they are not clearly written on the document.
 - Company names must be copied exactly as printed on the document header. If you cannot read a name, return null instead of inventing neutral placeholders or generic names like "Заря-агро" or "Завод Х".
@@ -219,7 +220,7 @@ VISION_USER_PROMPT = """
 - Поля supplier_name, supplier_tax_id, customer_name, customer_tax_id заполняй только значениями, которые видны на документе; если не читаются — возвращай null.
 - Строки таблицы (items) — только реальные позиции товаров, без строки "ИТОГО" и без дубликатов. Если в таблице 2 позиции, в items должно быть ровно 2 элемента.
 - Суммы и числа пиши с точкой в качестве разделителя.
-- Итоги (totals) бери из блока "ИТОГО". Если он не читается, оставь totals пустыми и укажи предупреждение.
+- Итоги (totals) бери из блока "ИТОГО" и переписывай точные значения (без округлений). totals.with_vat ≈ totals.without_vat + totals.vat_amount с допуском 0.02; если расхождение больше — всё равно сохрани цифры с документа и добавь предупреждение о несоответствии.
 - Не придумывай компании или суммы; если не уверен — оставь поле пустым.
 """.strip()
 
