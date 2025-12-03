@@ -14,6 +14,10 @@ ssh root@<IP_из_панели>
 apt update && apt upgrade -y
 apt install -y git python3 python3-venv python3-pip tesseract-ocr tesseract-ocr-rus tesseract-ocr-eng
 ```
+Если во время `apt upgrade` появляется фиолетовое окно «Services using outdated libraries», оставьте выбранными все сервисы и
+нажимайте **Tab** до кнопки `<Ok>` → **Enter**. Это перезапустит службы (включая `ssh`), чтобы они использовали обновлённые
+библиотеки. На VDS Beget это безопасно, соединение по SSH восстанавливается автоматически; если выбрали не то — повторите
+`apt upgrade`, окно появится снова.
 Опционально создайте отдельного пользователя:
 ```bash
 adduser --disabled-password --gecos "InvoiceBot" invoicebot
