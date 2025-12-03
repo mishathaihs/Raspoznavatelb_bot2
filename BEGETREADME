@@ -48,6 +48,11 @@ cd /opt/invoicebot
 git clone <URL_ВАШЕГО_РЕПО>.
 cd Raspoznavatelb_bot2/Bot
 ```
+Для текущего проекта пример команды:
+```bash
+git clone https://github.com/mishathaihs/Raspoznavatelb_bot2.git
+cd Raspoznavatelb_bot2/Bot
+```
 
 3) Виртуальное окружение и зависимости
 --------------------------------------
@@ -73,10 +78,16 @@ GOOGLE_DRIVE_FOLDER_ID=...       # папка для загрузки файло
 ALLOW_SHEETS_WITHOUT_DRIVE_FILE=false
 LOG_LEVEL=INFO
 ```
-- Через «Менеджер файлов» панели можно загрузить `credentials_drive.json` и `token_drive.json` в `Bot` или воспользоваться `scp`:
-```bash
-scp credentials_drive.json root@<IP>:/opt/invoicebot/Raspoznavatelb_bot2/Bot/
-```
+- Через «Менеджер файлов» панели можно загрузить `credentials_drive.json` и `token_drive.json` в `Bot` или воспользоваться `scp`.
+  Важно: `scp` нужно запускать **на вашей локальной машине**, а не внутри SSH-сессии. Примеры:
+  - Windows PowerShell / macOS / Linux:
+    ```bash
+    scp ./credentials_drive.json invoicebot@<IP>:/opt/invoicebot/Raspoznavatelb_bot2/Bot/
+    # если подключаетесь под root:
+    scp ./credentials_drive.json root@<IP>:/opt/invoicebot/Raspoznavatelb_bot2/Bot/
+    ```
+  - Графически через WinSCP: Host = `<IP>`, User = `invoicebot` (или `root`), Port = 22, путь назначения `/opt/invoicebot/Raspoznavatelb_bot2/Bot/`.
+  Если запустили `scp` на самом сервере, он будет ждать файл с вашей рабочей станции и завершится ошибкой — выйдите из SSH и выполните команду с локальной стороны.
 - Первичная авторизация Google (даёт `token_drive.json`):
 ```bash
 source .venv/bin/activate
