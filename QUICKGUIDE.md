@@ -1,5 +1,13 @@
 Краткий гайд по запуску бота на Beget VDS (Ubuntu) без git
 ========================================================
+
+Суперкратко (5 шагов)
+---------------------
+1) SSH под `root`: `apt update && apt upgrade -y` и `apt install -y python3 python3-venv python3-pip tesseract-ocr tesseract-ocr-rus tesseract-ocr-eng`.
+2) В файловом менеджере создайте `/opt/invoicebot` и загрузите туда всё из папки `Bot` + `.env`, `credentials_drive.json`, `token_drive.json` (если есть).
+3) В SSH: `cd /opt/invoicebot && python3 -m venv .venv && source .venv/bin/activate && pip install --upgrade pip && pip install -r requirements.txt`.
+4) Если нет `token_drive.json`: `cd /opt/invoicebot && source .venv/bin/activate && python scripts/init_drive_oauth.py`, открыть ссылку, выдать доступ Drive/Sheets, вставить код.
+5) Проверить: `source /opt/invoicebot/.venv/bin/activate && python main.py`. Для автозапуска используйте блок systemd ниже.
 1) Подготовка сервера (SSH под root)
 - В панели Beget откройте «Доступ», возьмите IP/пароль.
 - Подключитесь: `ssh root@<IP>`.
