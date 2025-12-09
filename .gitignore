@@ -1,0 +1,61 @@
+# Virtual environments
+.venv/
+venv/
+ENV/
+
+# Local environment and credentials
+.env
+.env.*
+!*.env.example
+*.log
+credentials_drive.json
+token_drive.json
+
+# OS / editor noise
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Build and cache outputs
+__pycache__/
+*.py[cod]
+*$py.class
+.eggs/
+*.egg-info/
+.dist/
+dist/
+build/
+.pytest_cache/
+.coverage*
+htmlcov/
+
+# Generated artifacts and binaries
+*.doc
+*.docx
+*.pdf
+*.xls
+*.xlsx
+*.jpg
+*.jpeg
+*.png
+*.gif
+*.bmp
+*.tif
+*.tiff
+*.mp3
+*.mp4
+*.zip
+*.7z
+*.db
+*.sqlite
+*.pyo
+*.pyd
+*.so
+*.dll
+*.exe
+
+# Generated templates and outputs
+Bot/templates/*.docx
+outputs/
+artifacts/

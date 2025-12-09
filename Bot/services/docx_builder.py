@@ -4,9 +4,7 @@ import copy
 import logging
 import re
 from decimal import Decimal
-import copy
-import logging
-import re
+from importlib import util
 from pathlib import Path
 from typing import Any, Iterable
 
@@ -17,7 +15,67 @@ from bot.models import Item, ParsedDocument
 from services.amounts import prefer_text_amount
 
 logger = logging.getLogger(__name__)
+
+
+BASE_DIR = Path(__file__).resolve().parent.parent
+
+DEFAULT_TEMPLATE_BUILDERS: dict[str, str] = {
+    "template_waybill.docx": "create_waybill_template",
+    "act_v2.docx": "create_act_template_v2",
+    "template_act.docx": "create_act_template",
+}
+
 PLACEHOLDER_PATTERN = re.compile(r"\{\{[^}]+\}\}")
+
+
+def ensure_default_templates() -> None:
+    """Generate default docx templates if they are missing.
+
+    This avoids runtime failures when the repository is deployed without
+    committing binary `.docx` templates. Only known default templates are
+    created; custom template paths must be provided by the user.
+    """
+
+    templates_dir = BASE_DIR / "templates"
+    created_any = False
+
+    module_path = BASE_DIR / "scripts" / "init_templates.py"
+    if not module_path.exists():  # pragma: no cover - filesystem guard
+        logger.warning("Template generator module not found at %s", module_path)
+        return
+
+    spec = util.spec_from_file_location("init_templates", module_path)
+    if spec is None or spec.loader is None:  # pragma: no cover - defensive
+        logger.warning("Could not load template generator spec from %s", module_path)
+        return
+
+    init_templates = util.module_from_spec(spec)
+    try:
+        spec.loader.exec_module(init_templates)
+    except Exception as exc:  # pragma: no cover - defensive import
+        logger.warning("Could not import template generator: %s", exc)
+        return
+
+    for filename, builder_name in DEFAULT_TEMPLATE_BUILDERS.items():
+        template_path = templates_dir / filename
+        if template_path.exists():
+            continue
+
+        builder = getattr(init_templates, builder_name, None)
+        if not builder:
+            logger.warning("No builder found for template %s", filename)
+            continue
+
+        try:
+            templates_dir.mkdir(parents=True, exist_ok=True)
+            builder(template_path)
+            created_any = True
+            logger.info("Generated missing template: %s", template_path)
+        except Exception as exc:  # pragma: no cover - depends on filesystem
+            logger.exception("Failed to generate template %s: %s", template_path, exc)
+
+    if not created_any:
+        logger.debug("All default templates already present")
 
 
 def _fmt(value: Any, text: str | None = None) -> str:
