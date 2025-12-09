@@ -126,6 +126,7 @@ General rules:
 - NEVER invent or hallucinate values that are not clearly visible on the image.
 - If you cannot confidently read a value, set it to null instead of guessing.
 - All money and numeric fields MUST use a dot as decimal separator, no thousand separators, e.g.: 1195.00, 239.00, 1434.00.
+- Totals must be copied exactly from the document totals row; preserve cents and do not round.
 - doc_type for this kind of document MUST be exactly "товарная_накладная".
 - Do NOT fabricate company types or addresses (like "ЗАО ХХХ 220039, г. Минск, ул. Долгобродская, 25") if they are not clearly written on the document.
 - Company names must be copied exactly as printed on the document header. If you cannot read a name, return null instead of inventing neutral placeholders or generic names like "Заря-агро" or "Завод Х".
@@ -219,7 +220,7 @@ VISION_USER_PROMPT = """
 - Поля supplier_name, supplier_tax_id, customer_name, customer_tax_id заполняй только значениями, которые видны на документе; если не читаются — возвращай null.
 - Строки таблицы (items) — только реальные позиции товаров, без строки "ИТОГО" и без дубликатов. Если в таблице 2 позиции, в items должно быть ровно 2 элемента.
 - Суммы и числа пиши с точкой в качестве разделителя.
-- Итоги (totals) бери из блока "ИТОГО". Если он не читается, оставь totals пустыми и укажи предупреждение.
+- Итоги (totals) бери из блока "ИТОГО" и переписывай точные значения (без округлений). totals.with_vat ≈ totals.without_vat + totals.vat_amount с допуском 0.02; если расхождение больше — всё равно сохрани цифры с документа и добавь предупреждение о несоответствии.
 - Не придумывай компании или суммы; если не уверен — оставь поле пустым.
 """.strip()
 
@@ -2031,11 +2032,55 @@ def _doc_type_from_text(raw_text: str | None, current: str | None) -> str | None
     if not raw_text:
         return current
     lowered = raw_text.lower()
-    if "накладн" in lowered:
-        return "товарная_накладная"
     if "акт" in lowered:
         return "акт"
+    if "накладн" in lowered:
+        return "товарная_накладная"
     return current
+
+
+SERVICE_KEYWORDS = (
+    "услуг",
+    "оказан",
+    "работ",
+    "подряд",
+    "монтаж",
+    "ремонт",
+    "обслужив",
+    "договор",
+    "аренд",
+    "поддержк",
+)
+
+
+def _refine_doc_type(parsed: ParsedDocument) -> None:
+    """Use text and item signals to disambiguate акт vs товарная накладная."""
+
+    doc_type = parsed.doc_type or "прочее"
+    text = (parsed.raw_text or parsed.raw_ocr_text or "").lower()
+    has_act_phrase = "акт" in text
+    has_waybill_phrase = "накладн" in text or "ттн" in text
+
+    qty_items = sum(1 for item in parsed.items if item.quantity is not None)
+    has_units = any(item.unit for item in parsed.items)
+    service_named = any(
+        any(keyword in (item.name or "").lower() for keyword in SERVICE_KEYWORDS)
+        for item in parsed.items
+    )
+    goods_like = qty_items > 0 or has_units
+
+    if has_act_phrase and not has_waybill_phrase:
+        parsed.doc_type = "акт"
+        return
+    if has_waybill_phrase and not has_act_phrase:
+        parsed.doc_type = "товарная_накладная"
+        return
+
+    if doc_type == "товарная_накладная" and service_named and not goods_like:
+        parsed.doc_type = "акт"
+        return
+    if doc_type in {"акт", "прочее"} and goods_like and not service_named:
+        parsed.doc_type = "товарная_накладная"
 
 
 def _convert_to_parsed_document(payload: dict[str, Any]) -> ParsedDocument:
@@ -2172,6 +2217,8 @@ def _convert_to_parsed_document(payload: dict[str, Any]) -> ParsedDocument:
     totals = parsed.totals or totals
     _recompute_vat_from_rate(totals, parsed.warnings)
     _validate_totals_consistency(parsed)
+
+    _refine_doc_type(parsed)
 
     _attach_confidence_warnings(
         parsed,

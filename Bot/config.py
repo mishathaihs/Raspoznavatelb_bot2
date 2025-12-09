@@ -47,6 +47,21 @@ class Settings(BaseSettings):
     allow_sheets_without_drive_file: bool = Field(
         False, validation_alias="ALLOW_SHEETS_WITHOUT_DRIVE_FILE"
     )
+    agents_spreadsheet_id: str | None = Field(
+        None,
+        validation_alias="AGENTS_SPREADSHEET_ID",
+        description="ID таблицы с агентами; по умолчанию используем основную таблицу для документов",
+    )
+    agents_worksheet_title: str = Field(
+        "Агенты",
+        validation_alias="AGENTS_WORKSHEET_TITLE",
+        description="Название листа с агентами",
+    )
+    agents_cache_seconds: int = Field(
+        180,
+        validation_alias="AGENTS_CACHE_SECONDS",
+        description="TTL кеша списка агентов из Google Sheets",
+    )
     our_org_name: str = Field("", validation_alias="OUR_ORG_NAME")
     our_companies: list[str] = Field(
         default_factory=lambda: [
@@ -96,6 +111,10 @@ class Settings(BaseSettings):
         self.google_sheets_spreadsheet_id = self._extract_spreadsheet_id(
             self._clean_env_value(self.google_sheets_spreadsheet_id)
         )
+        if self.agents_spreadsheet_id:
+            self.agents_spreadsheet_id = self._extract_spreadsheet_id(
+                self._clean_env_value(self.agents_spreadsheet_id)
+            )
         self.our_org_name = self._clean_env_value(self.our_org_name)
         if isinstance(self.our_companies, str):
             self.our_companies = [
