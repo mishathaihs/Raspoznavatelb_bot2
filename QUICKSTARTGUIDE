@@ -1,0 +1,87 @@
+QUICKSTART: запуск Telegram-инвойс-бота
+=====================================
+
+Минимальный план (3 шага)
+------------------------
+1) Установите зависимости под root:
+   ```bash
+   apt update && apt upgrade -y
+   apt install -y python3 python3-venv python3-pip tesseract-ocr tesseract-ocr-rus tesseract-ocr-eng
+   ```
+
+2) Скопируйте файлы в /opt/invoicebot (через файловый менеджер или SCP): весь каталог Bot, плюс рядом .env, credentials_drive.json, token_drive.json (если есть).
+   Структура должна быть такой:
+   ```
+   /opt/invoicebot/
+     main.py
+     requirements.txt
+     bot/
+     services/
+     scripts/
+     templates/
+     ...
+   ```
+
+3) Создайте окружение и поставьте зависимости:
+   ```bash
+   cd /opt/invoicebot
+   python3 -m venv .venv
+   source .venv/bin/activate
+   pip install --upgrade pip
+   pip install -r requirements.txt
+   ```
+
+Если нет token_drive.json
+-------------------------
+```bash
+source /opt/invoicebot/.venv/bin/activate
+cd /opt/invoicebot
+python scripts/init_drive_oauth.py
+```
+Откройте ссылку, дайте доступ Google Drive/Sheets, вставьте код — появится token_drive.json.
+
+Проверка запуска
+----------------
+```bash
+source /opt/invoicebot/.venv/bin/activate
+python main.py
+```
+Убедитесь, что бот принимает файлы и не пишет ошибок про шаблон/Google.
+
+Автозапуск через systemd (опционально)
+--------------------------------------
+```bash
+cat <<'UNIT' > /etc/systemd/system/invoicebot.service
+[Unit]
+Description=Telegram Invoice Bot
+After=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/invoicebot
+Environment="PYTHONUNBUFFERED=1"
+ExecStart=/opt/invoicebot/.venv/bin/python /opt/invoicebot/main.py
+Restart=always
+RestartSec=5
+User=root
+Group=root
+
+[Install]
+WantedBy=multi-user.target
+UNIT
+
+systemctl daemon-reload
+systemctl enable --now invoicebot.service
+```
+Логи: `journalctl -u invoicebot.service -f`.
+
+Обновление без git
+------------------
+1) Замените файлы в /opt/invoicebot через панель/менеджер файлов.
+2) Подтяните зависимости и перезапустите сервис (если используется systemd):
+   ```bash
+   cd /opt/invoicebot
+   source .venv/bin/activate
+   pip install -r requirements.txt
+   systemctl restart invoicebot.service
+   ```
