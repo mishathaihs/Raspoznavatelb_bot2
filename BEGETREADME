@@ -1,0 +1,121 @@
+Инструкция по деплою телеграм-бота на Beget VDS (Ubuntu)
+========================================================
+
+1) Доступ и подготовка системы
+------------------------------
+- Подключитесь по SSH к VDS (логин/пароль или SSH-ключи из панели Beget).
+- Обновите пакеты и установите базовые утилиты:
+  ```bash
+  sudo apt update && sudo apt upgrade -y
+  sudo apt install -y git python3 python3-venv python3-pip tesseract-ocr tesseract-ocr-rus tesseract-ocr-eng
+  ```
+- (Опционально) Создайте отдельного системного пользователя для бота:
+  ```bash
+  sudo adduser --disabled-password --gecos "InvoiceBot" invoicebot
+  sudo usermod -aG sudo invoicebot
+  sudo -iu invoicebot
+  ```
+
+2) Клонирование проекта
+-----------------------
+- Выберите рабочую директорию, например `/opt/invoicebot`:
+  ```bash
+  sudo mkdir -p /opt/invoicebot
+  sudo chown $USER:$USER /opt/invoicebot
+  cd /opt/invoicebot
+  git clone <URL_ВАШЕГО_РЕПО>.
+  cd Raspoznavatelb_bot2/Bot
+  ```
+
+3) Виртуальное окружение и зависимости
+--------------------------------------
+- Создайте и активируйте виртуальное окружение Python 3.10+:
+  ```bash
+  python3 -m venv .venv
+  source .venv/bin/activate
+  ```
+- Установите зависимости:
+  ```bash
+  pip install --upgrade pip
+  pip install -r requirements.txt
+  ```
+
+4) Конфигурация окружения
+-------------------------
+- Скопируйте шаблон `.env.example` (если нужен) и заполните его в файле `.env` в каталоге `Bot`:
+  ```env
+  TELEGRAM_BOT_TOKEN=...           # токен вашего бота от BotFather
+  OPENAI_API_KEY=...               # ключ OpenAI (модель gpt-4.1)
+  GOOGLE_SHEETS_SPREADSHEET_ID=... # id таблицы или полная ссылка
+  GOOGLE_SHEETS_WORKSHEET_TITLE=...# название листа
+  GOOGLE_AUTH_MODE=oauth
+  GOOGLE_OAUTH_CLIENT_SECRETS_FILE=credentials_drive.json
+  GOOGLE_OAUTH_TOKEN_FILE=token_drive.json
+  GOOGLE_DRIVE_FOLDER_ID=...       # папка для загрузки файлов
+  ALLOW_SHEETS_WITHOUT_DRIVE_FILE=false
+  LOG_LEVEL=INFO
+  ```
+- Поместите файлы `credentials_drive.json` и (после авторизации) `token_drive.json` в каталог `Bot`.
+- Выполните начальную авторизацию Google (при первом деплое). На сервере без GUI Google выдаст ссылку в консоль — откройте её в браузере, подтвердите доступ, вставьте код обратно:
+  ```bash
+  source .venv/bin/activate
+  python scripts/init_drive_oauth.py
+  ```
+
+5) Проверка запуска вручную
+---------------------------
+- Запустите бота из каталога `Bot` и убедитесь, что ошибок нет:
+  ```bash
+  source .venv/bin/activate
+  python main.py
+  ```
+- Отправьте документ в Telegram-бот и проверьте, что данные пишутся в Google Sheets/Drive.
+
+6) Автозапуск через systemd
+---------------------------
+- Создайте сервис-файл `/etc/systemd/system/invoicebot.service` (пути скорректируйте под своё расположение):
+  ```ini
+  [Unit]
+  Description=Telegram Invoice Bot
+  After=network-online.target
+
+  [Service]
+  Type=simple
+  WorkingDirectory=/opt/invoicebot/Raspoznavatelb_bot2/Bot
+  Environment="PYTHONUNBUFFERED=1"
+  ExecStart=/opt/invoicebot/Raspoznavatelb_bot2/Bot/.venv/bin/python /opt/invoicebot/Raspoznavatelb_bot2/Bot/main.py
+  Restart=always
+  RestartSec=5
+  User=invoicebot
+  Group=invoicebot
+
+  [Install]
+  WantedBy=multi-user.target
+  ```
+- Примените и запустите сервис:
+  ```bash
+  sudo systemctl daemon-reload
+  sudo systemctl enable --now invoicebot.service
+  ```
+- Проверяйте логи:
+  ```bash
+  journalctl -u invoicebot.service -f
+  ```
+
+7) Обновления и обслуживание
+---------------------------
+- Для обновления кода:
+  ```bash
+  cd /opt/invoicebot/Raspoznavatelb_bot2
+  git pull
+  cd Bot && source .venv/bin/activate && pip install -r requirements.txt
+  sudo systemctl restart invoicebot.service
+  ```
+- Регулярно ставьте системные обновления (`sudo apt update && sudo apt upgrade`).
+- Следите за сроком действия токенов: при истечении заново выполните `scripts/init_drive_oauth.py`.
+
+Примечания
+----------
+- Telegram не требует входящих портов, достаточно исходящих HTTPS.
+- Убедитесь, что часовой пояс сервера настроен корректно (`sudo timedatectl set-timezone Europe/Minsk`, если нужно).
+- Для резервного копирования можно сохранять `.env`, `credentials_drive.json`, `token_drive.json` и данные таблицы Google.
