@@ -6,6 +6,7 @@ from typing import Sequence
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
+from google.auth.exceptions import RefreshError
 
 
 def get_oauth_credentials(
@@ -23,11 +24,24 @@ def get_oauth_credentials(
 
     if token_file.exists():
         creds = Credentials.from_authorized_user_file(str(token_file), scopes=scopes)
+        # Если токен сохранён с устаревшими или неполными scope, удаляем и переинициализируем ниже
+        missing_scopes = set(scopes) - set(creds.scopes or [])
+        if missing_scopes:
+            token_file.unlink(missing_ok=True)
+            creds = None
 
     if not creds or not creds.valid:
         if creds and creds.expired and creds.refresh_token:
-            creds.refresh(Request())
-        else:
+            try:
+                creds.refresh(Request())
+            except RefreshError as exc:
+                # invalid_scope или похожие ошибки – сбрасываем токен и запускаем полное согласование
+                token_file.unlink(missing_ok=True)
+                creds = None
+                if "invalid_scope" not in str(exc):
+                    raise
+
+        if not creds or not creds.valid:
             flow = InstalledAppFlow.from_client_secrets_file(
                 str(client_secrets_file),
                 scopes=scopes,
